@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:factory_management/app/di/injection.dart';
 import 'package:factory_management/core/constants/app_fonts.dart';
 import 'package:factory_management/core/constants/app_sizes.dart';
 import 'package:factory_management/core/theme/app_theme.dart';
+import 'package:factory_management/core/utils/form_draft.dart';
 import 'package:factory_management/features/factory/domain/entities/factory_entity.dart';
 import 'package:factory_management/features/factory_category/domain/entities/category_entity.dart';
 import 'package:factory_management/features/factory_category/presentation/bloc/category_bloc.dart';
@@ -26,40 +28,103 @@ class FactoryFormDialog extends StatefulWidget {
 }
 
 class _FactoryFormDialogState extends State<FactoryFormDialog> {
+  static const _draftKey = 'draft_factory_create';
+
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _name = TextEditingController(text: widget.factory?.name);
-  late final TextEditingController _phone = TextEditingController(text: widget.factory?.phone);
-  late final TextEditingController _wechat = TextEditingController(text: widget.factory?.wechatId);
-  late final TextEditingController _address = TextEditingController(text: widget.factory?.address);
+  late final TextEditingController _name;
+  late final TextEditingController _phone;
+  late final TextEditingController _wechat;
+  late final TextEditingController _address;
   int? _categoryId;
   final List<_ProductRow> _products = [];
+  Timer? _debounce;
+
+  bool get _isCreate => widget.factory == null;
 
   @override
   void initState() {
     super.initState();
-    _categoryId = widget.factory?.factoryCategoryId;
-    if (widget.factory != null) {
+    if (_isCreate) {
+      final draft = FormDraft.load(_draftKey);
+      _name    = TextEditingController(text: draft?['name']    ?? '');
+      _phone   = TextEditingController(text: draft?['phone']   ?? '');
+      _wechat  = TextEditingController(text: draft?['wechat']  ?? '');
+      _address = TextEditingController(text: draft?['address'] ?? '');
+      _categoryId = draft?['categoryId'] as int?;
+      for (final p in (draft?['products'] as List<dynamic>? ?? [])) {
+        final row = _ProductRow(name: p['name'] ?? '');
+        for (final m in (p['models'] as List<dynamic>? ?? [])) {
+          final modelRow = _ModelRow(
+            name: m['name'] ?? '',
+            price: m['price'] ?? '',
+            info: m['info'] ?? '',
+            imageUrls: List<String>.from(m['imageUrls'] ?? []),
+          );
+          _listenModel(modelRow);
+          row.models.add(modelRow);
+        }
+        row.nameCtrl.addListener(_saveDraft);
+        _products.add(row);
+      }
+      for (final c in [_name, _phone, _wechat, _address]) c.addListener(_saveDraft);
+    } else {
+      _name    = TextEditingController(text: widget.factory?.name);
+      _phone   = TextEditingController(text: widget.factory?.phone);
+      _wechat  = TextEditingController(text: widget.factory?.wechatId);
+      _address = TextEditingController(text: widget.factory?.address);
+      _categoryId = widget.factory?.factoryCategoryId;
       for (final p in widget.factory!.products) {
         final row = _ProductRow(name: p.name);
         for (final m in p.models) {
           row.models.add(_ModelRow(
-          name: m.name, price: m.price.toString(), info: m.info,
-          imageUrls: (m.images ?? '').split(',').where((s) => s.isNotEmpty).toList(),
-        ));
+            name: m.name, price: m.price.toString(), info: m.info,
+            imageUrls: (m.images ?? '').split(',').where((s) => s.isNotEmpty).toList(),
+          ));
         }
         _products.add(row);
       }
     }
   }
 
+  void _listenModel(_ModelRow m) {
+    m.nameCtrl.addListener(_saveDraft);
+    m.priceCtrl.addListener(_saveDraft);
+    m.infoCtrl.addListener(_saveDraft);
+  }
+
+  void _saveDraft() {
+    if (!_isCreate) return;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      FormDraft.save(_draftKey, {
+        'name': _name.text,
+        'phone': _phone.text,
+        'wechat': _wechat.text,
+        'address': _address.text,
+        'categoryId': _categoryId,
+        'products': _products.map((p) => {
+          'name': p.nameCtrl.text,
+          'models': p.models.map((m) => {
+            'name': m.nameCtrl.text,
+            'price': m.priceCtrl.text,
+            'info': m.infoCtrl.text,
+            'imageUrls': m.imageUrls,
+          }).toList(),
+        }).toList(),
+      });
+    });
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _name.dispose(); _phone.dispose(); _wechat.dispose(); _address.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (_isCreate) FormDraft.clear(_draftKey);
     final data = <String, dynamic>{
       'name': _name.text.trim(),
       if (_phone.text.trim().isNotEmpty) 'phone': _phone.text.trim(),
@@ -116,7 +181,7 @@ class _FactoryFormDialogState extends State<FactoryFormDialog> {
                           hint: l10n.fieldSelectCategory,
                           value: _categoryId,
                           items: cats.map((c) => DropdownMenuItem(value: c.id, child: Text(c.categoryName))).toList(),
-                          onChanged: (v) => setState(() => _categoryId = v),
+                          onChanged: (v) => setState(() { _categoryId = v; _saveDraft(); }),
                           validator: (v) => v == null ? l10n.fieldRequired : null,
                         );
                       },
@@ -145,7 +210,11 @@ class _FactoryFormDialogState extends State<FactoryFormDialog> {
                     icon: Icons.add,
                     small: true,
                     variant: AppButtonVariant.secondary,
-                    onPressed: () => setState(() => _products.add(_ProductRow())),
+                    onPressed: () {
+                      final row = _ProductRow();
+                      row.nameCtrl.addListener(_saveDraft);
+                      setState(() { _products.add(row); _saveDraft(); });
+                    },
                   ),
                 ],
               ),
@@ -194,12 +263,16 @@ class _FactoryFormDialogState extends State<FactoryFormDialog> {
                     icon: Icons.add,
                     small: true,
                     variant: AppButtonVariant.ghost,
-                    onPressed: () => setState(() => product.models.add(_ModelRow())),
+                    onPressed: () {
+                      final m = _ModelRow();
+                      _listenModel(m);
+                      setState(() { product.models.add(m); _saveDraft(); });
+                    },
                   ),
                   const SizedBox(width: 4),
                   IconButton(
                     icon: Icon(Icons.close, size: AppSizes.iconSizeSm, color: c.error),
-                    onPressed: () => setState(() => _products.removeAt(pi)),
+                    onPressed: () => setState(() { _products.removeAt(pi); _saveDraft(); }),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -239,7 +312,7 @@ class _FactoryFormDialogState extends State<FactoryFormDialog> {
                 const Spacer(),
                 IconButton(
                   icon: Icon(Icons.close, size: AppSizes.iconSizeSm, color: c.error),
-                  onPressed: () => setState(() => _products[pi].models.removeAt(mi)),
+                  onPressed: () => setState(() { _products[pi].models.removeAt(mi); _saveDraft(); }),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -259,7 +332,7 @@ class _FactoryFormDialogState extends State<FactoryFormDialog> {
             const SizedBox(height: AppSizes.sm),
             ImagePickerField(
               initialUrls: model.imageUrls,
-              onChanged: (urls) => setState(() => model.imageUrls = urls),
+              onChanged: (urls) => setState(() { model.imageUrls = urls; _saveDraft(); }),
             ),
           ],
         ),

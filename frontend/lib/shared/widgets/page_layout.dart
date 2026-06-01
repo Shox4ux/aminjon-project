@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:factory_management/core/constants/app_fonts.dart';
 import 'package:factory_management/core/constants/app_sizes.dart';
@@ -229,46 +228,38 @@ class AppTableWrapper extends StatelessWidget {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tableWidth = max(AppSizes.tableMinWidth, constraints.maxWidth - 2 * AppSizes.base);
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSizes.base),
-          child: Card(
-            margin: EdgeInsets.zero,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              side: BorderSide(color: c.border),
-            ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: tableWidth),
-                child: DataTable(
-                  headingRowColor: WidgetStateProperty.all(c.tableHeader),
-                  headingRowHeight: AppSizes.tableHeaderHeight,
-                  dataRowMinHeight: AppSizes.tableRowHeight,
-                  dataRowMaxHeight: AppSizes.tableRowHeight + 16,
-                  dividerThickness: 1,
-                  columnSpacing: 20,
-                  horizontalMargin: 20,
-                  columns: columns
-                      .map((col) => DataColumn(
-                            label: Text(col,
-                                style: TextStyle(
-                                    fontSize: AppFonts.sm,
-                                    fontWeight: FontWeight.w600,
-                                    color: c.textSecondary)),
-                          ))
-                      .toList(),
-                  rows: rows,
-                ),
-              ),
-            ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSizes.base),
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          side: BorderSide(color: c.border),
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(c.tableHeader),
+            headingRowHeight: AppSizes.tableHeaderHeight,
+            dataRowMinHeight: AppSizes.tableRowHeight,
+            dataRowMaxHeight: AppSizes.tableRowHeight + 16,
+            dividerThickness: 1,
+            columnSpacing: 16,
+            horizontalMargin: 16,
+            columns: columns
+                .map((col) => DataColumn(
+                      label: Text(col,
+                          style: TextStyle(
+                              fontSize: AppFonts.sm,
+                              fontWeight: FontWeight.w600,
+                              color: c.textSecondary)),
+                    ))
+                .toList(),
+            rows: rows,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

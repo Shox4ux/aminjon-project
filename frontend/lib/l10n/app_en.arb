@@ -43,7 +43,6 @@
   "colAddress": "Address",
   "colCategory": "Category",
   "colProducts": "Products",
-  "colImage": "Image",
   "colModels": "Models",
   "colPrice": "Price",
   "searchByName": "Search by name...",

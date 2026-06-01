@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:factory_management/core/constants/app_fonts.dart';
 import 'package:factory_management/core/constants/app_sizes.dart';
 import 'package:factory_management/core/theme/app_theme.dart';
+import 'package:factory_management/core/utils/form_draft.dart';
 import 'package:factory_management/features/factory/domain/entities/factory_entity.dart';
 import 'package:factory_management/features/product/domain/entities/product_entity.dart';
 import 'package:factory_management/l10n/app_localizations.dart';
@@ -27,16 +29,37 @@ class ProductFormDialog extends StatefulWidget {
 }
 
 class _ProductFormDialogState extends State<ProductFormDialog> {
+  static const _draftKey = 'draft_product_create';
+
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _name = TextEditingController(text: widget.product?.name);
+  late final TextEditingController _name;
   int? _factoryId;
   final List<_ModelRow> _models = [];
+  Timer? _debounce;
+
+  bool get _isCreate => widget.product == null;
 
   @override
   void initState() {
     super.initState();
-    _factoryId = widget.product?.factoryId;
-    if (widget.product != null) {
+    if (_isCreate) {
+      final draft = FormDraft.load(_draftKey);
+      _name = TextEditingController(text: draft?['name'] ?? '');
+      _factoryId = draft?['factoryId'] as int?;
+      for (final m in (draft?['models'] as List<dynamic>? ?? [])) {
+        final row = _ModelRow(
+          name: m['name'] ?? '',
+          price: m['price'] ?? '',
+          info: m['info'] ?? '',
+          imageUrls: List<String>.from(m['imageUrls'] ?? []),
+        );
+        _listenModel(row);
+        _models.add(row);
+      }
+      _name.addListener(_saveDraft);
+    } else {
+      _name = TextEditingController(text: widget.product?.name);
+      _factoryId = widget.product?.factoryId;
       for (final m in widget.product!.models) {
         _models.add(_ModelRow(
           name: m.name,
@@ -48,14 +71,39 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
     }
   }
 
+  void _listenModel(_ModelRow m) {
+    m.nameCtrl.addListener(_saveDraft);
+    m.priceCtrl.addListener(_saveDraft);
+    m.infoCtrl.addListener(_saveDraft);
+  }
+
+  void _saveDraft() {
+    if (!_isCreate) return;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      FormDraft.save(_draftKey, {
+        'name': _name.text,
+        'factoryId': _factoryId,
+        'models': _models.map((m) => {
+          'name': m.nameCtrl.text,
+          'price': m.priceCtrl.text,
+          'info': m.infoCtrl.text,
+          'imageUrls': m.imageUrls,
+        }).toList(),
+      });
+    });
+  }
+
   @override
   void dispose() {
+    _debounce?.cancel();
     _name.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (_isCreate) FormDraft.clear(_draftKey);
     final data = <String, dynamic>{
       'name': _name.text.trim(),
       'factory_id': _factoryId,
@@ -95,7 +143,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                     items: widget.factories
                         .map((f) => DropdownMenuItem(value: f.id, child: Text(f.name)))
                         .toList(),
-                    onChanged: (v) => setState(() => _factoryId = v),
+                    onChanged: (v) => setState(() { _factoryId = v; _saveDraft(); }),
                     validator: (v) => v == null ? l10n.fieldRequired : null,
                   ),
                 ),
@@ -119,7 +167,11 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   icon: Icons.add,
                   small: true,
                   variant: AppButtonVariant.secondary,
-                  onPressed: () => setState(() => _models.add(_ModelRow())),
+                  onPressed: () {
+                    final m = _ModelRow();
+                    _listenModel(m);
+                    setState(() { _models.add(m); _saveDraft(); });
+                  },
                 ),
               ],
             ),
@@ -164,7 +216,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   const Spacer(),
                   IconButton(
                     icon: Icon(Icons.close, size: AppSizes.iconSizeSm, color: c.error),
-                    onPressed: () => setState(() => _models.removeAt(mi)),
+                    onPressed: () => setState(() { _models.removeAt(mi); _saveDraft(); }),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -206,7 +258,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   const SizedBox(height: AppSizes.sm),
                   ImagePickerField(
                     initialUrls: model.imageUrls,
-                    onChanged: (urls) => setState(() => model.imageUrls = urls),
+                    onChanged: (urls) => setState(() { model.imageUrls = urls; _saveDraft(); }),
                   ),
                 ],
               ),

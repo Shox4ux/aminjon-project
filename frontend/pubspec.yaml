@@ -1,0 +1,54 @@
+name: factory_management
+description: Factory Management System
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
+  cupertino_icons: ^1.0.6
+
+  # State management
+  flutter_bloc: ^8.1.5
+  bloc: ^8.1.4
+  equatable: ^2.0.5
+
+  # DI
+  get_it: ^7.7.0
+
+  # Network
+  dio: ^5.4.3+1
+  retrofit: ^4.1.0
+  json_annotation: ^4.9.0
+
+  # Routing
+  go_router: ^13.2.4
+
+  # Functional
+  dartz: ^0.10.1
+
+  # File picking
+  file_picker: ^8.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  retrofit_generator: ^10.2.6
+  json_serializable: ^6.8.0
+  build_runner: ^2.4.9
+  mocktail: ^1.0.3
+  bloc_test: ^9.1.7
+
+flutter:
+  generate: true
+  uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/fonts/

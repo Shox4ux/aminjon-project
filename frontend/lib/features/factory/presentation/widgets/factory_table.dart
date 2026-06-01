@@ -7,6 +7,7 @@ import 'package:factory_management/core/constants/app_fonts.dart';
 import 'package:factory_management/core/theme/app_theme.dart';
 import 'package:factory_management/features/factory/domain/entities/factory_entity.dart';
 import 'package:factory_management/l10n/app_localizations.dart';
+import 'package:factory_management/shared/widgets/compact_tag.dart';
 import 'package:factory_management/shared/widgets/page_layout.dart';
 
 class FactoryTable extends StatelessWidget {
@@ -57,41 +58,29 @@ class FactoryTable extends StatelessWidget {
                 DataCell(_CopyableCell(f.wechatId,
                     style: TextStyle(
                         fontSize: AppFonts.sm, color: c.textSecondary))),
-                DataCell(_CopyableCell(f.address,
-                    style: TextStyle(
-                        fontSize: AppFonts.sm, color: c.textSecondary))),
+                DataCell(
+                  SizedBox(
+                    width: 130,
+                    child: Tooltip(
+                      message: f.address ?? '',
+                      child: _CopyableCell(
+                        f.address,
+                        style: TextStyle(fontSize: AppFonts.sm, color: c.textSecondary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
                 DataCell(
                   Wrap(
-                    spacing: 4,
-                    children: f.products
-                        .take(3)
-                        .map((p) => Chip(
-                              label: Text(p.name,
-                                  style: TextStyle(
-                                      fontSize: AppFonts.xs,
-                                      color: c.chipText)),
-                              backgroundColor: c.chipBg,
-                              side: BorderSide.none,
-                              padding: EdgeInsets.zero,
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ))
-                        .toList()
-                      ..addAll(f.products.length > 3
-                          ? [
-                              Chip(
-                                label: Text('+${f.products.length - 3}',
-                                    style: TextStyle(
-                                        fontSize: AppFonts.xs,
-                                        color: c.textSecondary)),
-                                backgroundColor: c.tableHeader,
-                                side: BorderSide.none,
-                                padding: EdgeInsets.zero,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                              )
-                            ]
-                          : []),
+                    spacing: 3,
+                    runSpacing: 3,
+                    children: [
+                      ...f.products.take(2).map((p) => CompactTag(p.name)),
+                      if (f.products.length > 2)
+                        CompactTag('+${f.products.length - 2}', muted: true),
+                    ],
                   ),
                 ),
                 DataCell(actionCell(context,
@@ -105,8 +94,10 @@ class FactoryTable extends StatelessWidget {
 class _CopyableCell extends StatelessWidget {
   final String? value;
   final TextStyle? style;
+  final int? maxLines;
+  final TextOverflow? overflow;
 
-  const _CopyableCell(this.value, {this.style});
+  const _CopyableCell(this.value, {this.style, this.maxLines, this.overflow});
 
   @override
   Widget build(BuildContext context) {
@@ -120,8 +111,6 @@ class _CopyableCell extends StatelessWidget {
         child: GestureDetector(
           onTap: () async {
             bool copied = false;
-            // execCommand MUST run synchronously before any await,
-            // otherwise the browser's user-gesture context is lost.
             try {
               final ta = html.TextAreaElement()
                 ..value = value!
@@ -133,7 +122,6 @@ class _CopyableCell extends StatelessWidget {
               copied = html.document.execCommand('copy');
               ta.remove();
             } catch (_) {}
-            // Also try the async clipboard API (works on HTTPS).
             if (!copied) {
               try {
                 await Clipboard.setData(ClipboardData(text: value!));
@@ -151,7 +139,7 @@ class _CopyableCell extends StatelessWidget {
               );
             }
           },
-          child: Text(value!, style: style),
+          child: Text(value!, style: style, maxLines: maxLines, overflow: overflow),
         ),
       ),
     );
