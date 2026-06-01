@@ -1,17 +1,25 @@
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'dart:js_interop';
+
+@JS('localStorage.getItem')
+external String? _getItem(String key);
+
+@JS('localStorage.setItem')
+external void _setItem(String key, String value);
+
+@JS('localStorage.removeItem')
+external void _removeItem(String key);
 
 class FormDraft {
   static void save(String key, Map<String, dynamic> data) {
     try {
-      html.window.localStorage[key] = jsonEncode(data);
+      _setItem(key, jsonEncode(data));
     } catch (_) {}
   }
 
   static Map<String, dynamic>? load(String key) {
     try {
-      final raw = html.window.localStorage[key];
+      final raw = _getItem(key);
       if (raw == null) return null;
       return jsonDecode(raw) as Map<String, dynamic>;
     } catch (_) {
@@ -21,7 +29,7 @@ class FormDraft {
 
   static void clear(String key) {
     try {
-      html.window.localStorage.remove(key);
+      _removeItem(key);
     } catch (_) {}
   }
 }
